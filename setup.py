@@ -7,6 +7,7 @@ setup(
     description='Check for conflicts between network subnets',
     author='Federico Giuba',
     author_email='federico.giuba@gmail.com',
+    url='https://github.com/fgiuba/ipconflict',
     classifiers=[
         'Development Status :: 5 - Stable',
         'Programming Language :: Python :: 2',
