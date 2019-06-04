@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 import argparse
-import os
 import sys
 
-from ipconflict.subnet import check_conflicts
+from ipconflict.subnet import check_conflicts, parse_subnet_file
 
 
 epilog = """examples:
@@ -47,10 +46,7 @@ def main():
     subnets = args.subnets
     subnet_file = args.from_file
     if subnet_file:
-        if os.path.isfile(subnet_file):
-            subnets += open(subnet_file).read().splitlines()
-        else:
-            print(u'Error: invalid subnet file')
+        subnets += parse_subnet_file(subnet_file)
     conflicts = check_conflicts(subnets)
     print_results(conflicts, args.print_conflicts)
 
