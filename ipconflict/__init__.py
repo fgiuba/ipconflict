@@ -6,7 +6,10 @@ import sys
 from ipconflict.subnet import check_conflicts, parse_subnet_file
 
 
-epilog = """examples:
+version = u'0.2.0'
+
+
+epilog = u"""examples:
 \tipconflict 10.0.0.0/24 10.0.0.1/16
 \tipconflict 10.0.0.0/24 10.0.0.20-10.0.0.25
 \tipconflict -f my-subnets.txt
@@ -36,11 +39,17 @@ def main():
     parser.add_argument('-f', '--from-file', default='',
                         help='load subnet definitions from file (one per line)')
     parser.add_argument('-p', '--print-conflicts', action='store_true',
-                        help='print overlapping IPs')
+                        help=u'print overlapping IPs')
+    parser.add_argument('-V', '--version', action='store_true',
+                        help=u'print ipconflict version')
 
     args = parser.parse_args(sys.argv[1:])
     if not args:
         parser.print_usage()
+        sys.exit(0)
+
+    if args.version:
+        print(u'ipconflict {}'.format(version))
         sys.exit(0)
 
     subnets = args.subnets
