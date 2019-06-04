@@ -9,7 +9,7 @@ setup(
     author_email='federico.giuba@gmail.com',
     url='https://github.com/fgiuba/ipconflict',
     classifiers=[
-        'Development Status :: 5 - Stable',
+        'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
