@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='ipconflict',
-    version='0.2.0',
+    version='0.2.1',
     description='Check for conflicts between network subnets',
     author='Federico Giuba',
     author_email='federico.giuba@gmail.com',

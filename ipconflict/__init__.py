@@ -6,7 +6,7 @@ import sys
 from ipconflict.subnet import check_conflicts, parse_subnet_file
 
 
-version = u'0.2.0'
+version = u'0.2.1'
 
 
 epilog = u"""examples:
