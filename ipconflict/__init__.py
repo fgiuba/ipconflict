@@ -35,9 +35,9 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument('subnets', nargs='*',
-                        help='list of subnets to be checked')
+                        help=u'list of subnets to be checked')
     parser.add_argument('-f', '--from-file', default='',
-                        help='load subnet definitions from file (one per line)')
+                        help=u'load subnet definitions from file (one per line)')
     parser.add_argument('-p', '--print-conflicts', action='store_true',
                         help=u'print overlapping IPs')
     parser.add_argument('-V', '--version', action='store_true',
