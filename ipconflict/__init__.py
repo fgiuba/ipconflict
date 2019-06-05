@@ -59,6 +59,9 @@ def main():
     subnet_file = args.from_file
     if subnet_file:
         subnets += parse_subnet_file(subnet_file)
+    if len(subnets) < 2:
+        print('must specify at least 2 subnets')
+        sys.exit(1)
     conflicts = check_conflicts(subnets)
     print_results(conflicts, args.print_conflicts)
 
