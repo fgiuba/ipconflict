@@ -17,9 +17,10 @@ epilog = u"""examples:
 """
 
 
-def print_results(conflicts, print_conflicts):
+def print_results(conflicts, print_conflicts, ip_only):
     for subnet_a, subnet_b, overlapping_ips in conflicts:
-        print(u'conflict found: {} <-> {}'.format(subnet_a, subnet_b))
+        if not ip_only:
+            print(u'conflict found: {} <-> {}'.format(subnet_a, subnet_b))
         if print_conflicts:
             for ip in overlapping_ips:
                 print(ip)
@@ -40,8 +41,10 @@ def main():
                         help=u'load subnet definitions from file (one per line)')
     parser.add_argument('-i', '--from-stdin', action='store_true',
                         help=u'load subnet definitions from stdin')
+    parser.add_argument('-o', '--ip-only', action='store_true',
+                        help=u'print only the overlapping IP addresses')
     parser.add_argument('-p', '--print-conflicts', action='store_true',
-                        help=u'print overlapping IPs')
+                        help=u'print overlapping IP addresses')
     parser.add_argument('-V', '--version', action='store_true',
                         help=u'print ipconflict version')
 
@@ -64,7 +67,7 @@ def main():
         print('must specify at least 2 subnets')
         sys.exit(1)
     conflicts = check_conflicts(subnets)
-    print_results(conflicts, args.print_conflicts)
+    print_results(conflicts, args.print_conflicts, args.ip_only)
 
 
 if __name__ == '__main__':
