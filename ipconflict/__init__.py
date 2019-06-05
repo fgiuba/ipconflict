@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from ipconflict.subnet import check_conflicts, parse_subnet_data, parse_subnet_file
+from ipconflict.subnet import check_conflicts, parse_stdin_data, parse_subnet_file
 
 
 version = u'0.2.1'
@@ -38,6 +38,8 @@ def main():
                         help=u'list of subnets to be checked')
     parser.add_argument('-f', '--from-file', default='',
                         help=u'load subnet definitions from file (one per line)')
+    parser.add_argument('-i', '--from-stdin', action='store_true',
+                        help=u'load subnet definitions from stdin')
     parser.add_argument('-p', '--print-conflicts', action='store_true',
                         help=u'print overlapping IPs')
     parser.add_argument('-V', '--version', action='store_true',
@@ -53,9 +55,8 @@ def main():
         sys.exit(0)
 
     subnets = args.subnets
-    stdin_data = sys.stdin.read()
-    if stdin_data:
-        subnets += parse_subnet_data(stdin_data)
+    if args.from_stdin:
+        subnets += parse_stdin_data()
     subnet_file = args.from_file
     if subnet_file:
         subnets += parse_subnet_file(subnet_file)
