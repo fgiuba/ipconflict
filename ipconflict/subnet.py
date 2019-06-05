@@ -22,7 +22,7 @@ def parse_subnet_data(data):
     lines = data.split()
     for line in lines:
         line = line.strip()
-        if not line.startswith('#'):
+        if not line or not line.startswith('#'):
             subnets.append(line)
     return subnets
 
