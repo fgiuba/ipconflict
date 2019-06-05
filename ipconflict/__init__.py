@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from ipconflict.subnet import check_conflicts, parse_subnet_file
+from ipconflict.subnet import check_conflicts, parse_subnet_data, parse_subnet_file
 
 
 version = u'0.2.1'
@@ -53,6 +53,9 @@ def main():
         sys.exit(0)
 
     subnets = args.subnets
+    stdin_data = sys.stdin.read()
+    if stdin_data:
+        subnets += parse_subnet_data(stdin_data)
     subnet_file = args.from_file
     if subnet_file:
         subnets += parse_subnet_file(subnet_file)

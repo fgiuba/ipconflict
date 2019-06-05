@@ -17,15 +17,20 @@ def get_ip_set(subnet):
             sys.exit(1)
 
 
-def parse_subnet_file(path):
+def parse_subnet_data(data):
     subnets = []
+    lines = data.split()
+    for line in lines:
+        line = line.strip()
+        if not line.startswith('#'):
+            subnets.append(line)
+    return subnets
+
+
+def parse_subnet_file(path):
     if os.path.isfile(path):
-        lines = open(path).read().splitlines()
-        for line in lines:
-            line = line.strip()
-            if not line.startswith('#'):
-                subnets.append(line)
-        return subnets
+        data = open(path).read()
+        return parse_subnet_data(data)
     else:
         print(u'warning: invalid subnets file')
         return []
