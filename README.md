@@ -1,5 +1,8 @@
 # ipconflict
 
+[![ipconflict](https://img.shields.io/badge/ipconflict-0.3.1-green.svg)](https://pypi.org/project/ipconflict/)
+[![Python version](https://img.shields.io/badge/python-2.6%20%7C%202.7%20%7C%203.4%20%7C%203.5%20%7C%203.6%20%7C%203.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+
 Check if two or more network subnets are overlapping.
 
 ## Install
@@ -12,18 +15,25 @@ Check if two or more network subnets are overlapping.
 * `ipconflict 10.0.0.0/22 10.0.1.1-10.0.1.5`
 * `ipconflict 172.16.0.0/22 172.16.1.0/24 172.16.3.0/27`
 
-For printing the overlapping IPs add `-p` (or `--print-conflicts`) option:
+#### Print overlapping IP addresses
+
 * `ipconflict -p 10.0.0.0/24 10.0.0.100-10.0.0.105`
 
-Subnets can be defined in a simple text file (one subnet per line):
-* `ipconflict -f /path/to/my/subnets`
+#### Subnets from file
 
-Other subnets can still be appended:
-* `ipconflict -f /path/to/my/subnets 192.168.5.0/27 10.0.128.0/21`
+* `ipconflict -f /path/to/subnets`
+
+#### Subnets from stdin
+
+* `echo "10.0.1.0/24 10.0.0.0/22" | ipconflict`
+
+#### Subnets from everywhere
+
+* `echo "10.0.0.0/16" | ipconflict -f /path/to/subnets 192.168.0.0/24 172.25.1.17`
 
 ## Subnet Definition
 
-Subnet can be specified in several ways:
+A subnet can be specified in several ways:
 
 * CIDR notation `192.168.0.0/24`
 * Single IP address `10.0.1.2`
