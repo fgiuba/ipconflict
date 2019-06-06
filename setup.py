@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='ipconflict',
-    version='0.3.1',
+    version='0.3.2',
     description='Check for conflicts between network subnets',
     long_description=long_description,
     long_description_content_type="text/markdown",
