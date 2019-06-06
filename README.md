@@ -25,11 +25,11 @@ Check if two or more network subnets are overlapping.
 
 #### Subnets from stdin
 
-* `echo "10.0.1.0/24 10.0.0.0/22" | ipconflict`
+* `echo "10.0.1.0/24 10.0.0.0/22" | ipconflict -i`
 
 #### Subnets from everywhere
 
-* `echo "10.0.0.0/16" | ipconflict -f /path/to/subnets 192.168.0.0/24 172.25.1.17`
+* `echo "10.0.0.0/16" | ipconflict -i -f /path/to/subnets 192.168.0.0/24 172.25.1.17`
 
 ## Subnet Definition
 
