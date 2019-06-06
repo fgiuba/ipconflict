@@ -1,10 +1,15 @@
 from setuptools import setup, find_packages
 
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
     name='ipconflict',
     version='0.3.0',
     description='Check for conflicts between network subnets',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author='Federico Giuba',
     author_email='federico.giuba@gmail.com',
     url='https://github.com/fgiuba/ipconflict',
@@ -27,3 +32,4 @@ setup(
         ],
     },
 )
+
