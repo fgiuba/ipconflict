@@ -39,4 +39,4 @@ A subnet can be specified in several ways:
 * Single IP address `10.0.1.2`
 * IP range `10.0.0.5-10.0.0.20`
 
-The tools works both with IPv4 and IPv6.
+This tool works both with IPv4 and IPv6.
