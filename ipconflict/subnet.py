@@ -19,7 +19,7 @@ def get_ip_set(subnet):
 
 def parse_subnet_data(data):
     subnets = []
-    lines = data.split()
+    lines = data.split('\n')
     for line in lines:
         line = line.strip()
         if not line or not line.startswith('#'):
