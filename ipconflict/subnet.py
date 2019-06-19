@@ -34,8 +34,8 @@ def parse_stdin_data():
 
 def parse_subnet_file(path):
     if os.path.isfile(path):
-        data = open(path).read()
-        return parse_subnet_data(data)
+        with open(path) as data:
+            return parse_subnet_data(data.read())
     else:
         print(u'warning: invalid subnets file')
         return []
