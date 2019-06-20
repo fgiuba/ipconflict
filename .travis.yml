@@ -3,9 +3,6 @@ matrix:
   include:
     - os: linux
       dist: trusty
-      python: 2.6
-    - os: linux
-      dist: trusty
       python: 2.7
     - os: linux
       dist: trusty
