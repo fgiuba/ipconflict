@@ -1,8 +1,12 @@
+import sys
 from setuptools import setup, find_packages
 
-
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+if sys.version_info.major == 3:
+    with open("README.md", "r", encoding="utf-8") as fh:
+        long_description = fh.read()
+else:
+    with open("README.md", "r") as fh:
+        long_description = fh.read()
 
 setup(
     name='ipconflict',
