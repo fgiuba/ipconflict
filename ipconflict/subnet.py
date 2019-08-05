@@ -29,7 +29,7 @@ def parse_subnet_data(data):
 
 def parse_stdin_data():
     data = sys.stdin.read()
-    return parse_subnet_data(data)
+    return [subnet.strip() for subnet in data.split() if subnet]
 
 
 def parse_subnet_file(path):
