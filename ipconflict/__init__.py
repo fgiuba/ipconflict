@@ -68,8 +68,12 @@ def main():
     if len(subnets) < 2:
         print('must specify at least 2 subnets')
         sys.exit(1)
-    conflicts = check_conflicts(subnets, args.quiet)
-    print_results(conflicts, args.print_conflicts, args.ip_only)
+    try:
+        conflicts = check_conflicts(subnets, args.quiet)
+        print_results(conflicts, args.print_conflicts, args.ip_only)
+    except KeyboardInterrupt:
+        print('aborted\n')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
