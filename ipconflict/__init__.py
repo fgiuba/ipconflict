@@ -45,6 +45,8 @@ def main():
                         help=u'print only the overlapping IP addresses')
     parser.add_argument('-p', '--print-conflicts', action='store_true',
                         help=u'print overlapping IP addresses')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                        help=u'show progress status')
     parser.add_argument('-V', '--version', action='store_true',
                         help=u'print ipconflict version')
 
@@ -66,7 +68,7 @@ def main():
     if len(subnets) < 2:
         print('must specify at least 2 subnets')
         sys.exit(1)
-    conflicts = check_conflicts(subnets)
+    conflicts = check_conflicts(subnets, args.quiet)
     print_results(conflicts, args.print_conflicts, args.ip_only)
 
 

@@ -3,6 +3,7 @@ import sys
 
 from netaddr import IPRange, IPSet
 from netaddr.core import AddrFormatError
+from tqdm import tqdm
 
 
 def get_ip_set(subnet):
@@ -41,9 +42,9 @@ def parse_subnet_file(path):
         return []
 
 
-def check_conflicts(subnets):
+def check_conflicts(subnets, quiet=False):
     conflicts = []
-    for idx, subnet_a in enumerate(subnets):
+    for idx, subnet_a in tqdm(enumerate(subnets), unit='subnet', total=len(subnets), disable=quiet):
         for subnet_b in subnets[idx+1:]:
             overlapping_ips = get_ip_set(subnet_a) & get_ip_set(subnet_b)
             if overlapping_ips:

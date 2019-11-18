@@ -28,7 +28,7 @@ setup(
     ],
     packages=find_packages(exclude=['tests*']),
     install_requires=[
-        'netaddr==0.7.19',
+        'netaddr', 'tqdm'
     ],
     entry_points={
         'console_scripts': [
