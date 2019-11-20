@@ -1,7 +1,7 @@
 # ipconflict
 
 [![Downloads](https://pepy.tech/badge/ipconflict)](https://pepy.tech/project/ipconflict)
-[![ipconflict](https://img.shields.io/badge/ipconflict-0.3.6-green.svg)](https://pypi.org/project/ipconflict/)
+[![ipconflict](https://img.shields.io/badge/ipconflict-0.4.0-green.svg)](https://pypi.org/project/ipconflict/)
 [![Python version](https://img.shields.io/badge/python-2.6%20%7C%202.7%20%7C%203.4%20%7C%203.5%20%7C%203.6%20%7C%203.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
 
 Check if two or more network subnets are overlapping.
