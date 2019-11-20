@@ -28,7 +28,7 @@ setup(
     ],
     packages=find_packages(exclude=['tests*']),
     install_requires=[
-        'netaddr', 'tqdm'
+        'netaddr', 'py-radix', 'tqdm'
     ],
     entry_points={
         'console_scripts': [

@@ -1,6 +1,7 @@
 import os
 import sys
 
+import radix
 from netaddr import IPRange, IPSet
 from netaddr.core import AddrFormatError
 from tqdm import tqdm
@@ -42,11 +43,19 @@ def parse_subnet_file(path):
         return []
 
 
-def check_conflicts(subnets, quiet=False):
+def check_conflicts(subnets, quiet=True):
     conflicts = []
+    rtree = radix.Radix()
     for idx, subnet_a in tqdm(enumerate(subnets), unit='subnet', total=len(subnets), disable=quiet):
-        for subnet_b in subnets[idx+1:]:
-            overlapping_ips = get_ip_set(subnet_a) & get_ip_set(subnet_b)
-            if overlapping_ips:
-                conflicts.append((subnet_a, subnet_b, overlapping_ips))
+        set_a = get_ip_set(subnet_a)
+        matched = False
+        for cidr in set_a.iter_cidrs():
+            cidr = str(cidr)
+            if (rtree.search_covered(cidr) or rtree.search_covering(cidr)) and not matched:
+                for subnet_b in subnets[:idx]:
+                    overlapping_ips = set_a & get_ip_set(subnet_b)
+                    if overlapping_ips:
+                        conflicts.append((subnet_b, subnet_a, overlapping_ips))
+                matched = True
+            rtree.add(cidr)
     return conflicts
