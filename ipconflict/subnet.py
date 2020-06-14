@@ -16,7 +16,7 @@ def get_ip_set(subnet):
             return IPSet(IPRange(start, end))
         except (AddrFormatError, ValueError):
             print(u'error: invalid subnet format {}'.format(subnet))
-            sys.exit(1)
+            sys.exit(2)
 
 
 def parse_subnet_data(data):

@@ -10,10 +10,15 @@ version = u'0.4.0'
 
 
 epilog = u"""examples:
-\tipconflict 10.0.0.0/24 10.0.0.1/16
-\tipconflict 10.0.0.0/24 10.0.0.20-10.0.0.25
-\tipconflict -f my-subnets.txt
-\tipconflict -f my-subnets.txt 192.168.0.0/24
+  ipconflict 10.0.0.0/24 10.0.0.1/16
+  ipconflict 10.0.0.0/24 10.0.0.20-10.0.0.25
+  ipconflict -f my-subnets.txt
+  ipconflict -f my-subnets.txt 192.168.0.0/24
+
+exit status:
+  0: one or more conflicts found
+  1: no conflict found
+  2: aborted or invalid input
 """
 
 
@@ -67,13 +72,18 @@ def main():
         subnets += parse_subnet_file(subnet_file)
     if len(subnets) < 2:
         print('must specify at least 2 subnets')
-        sys.exit(1)
+        sys.exit(2)
     try:
         conflicts = check_conflicts(subnets, args.quiet)
         print_results(conflicts, args.print_conflicts, args.ip_only)
     except KeyboardInterrupt:
         print('aborted\n')
-        sys.exit(1)
+        sys.exit(2)
+    else:
+        if conflicts:
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
 
 if __name__ == '__main__':
