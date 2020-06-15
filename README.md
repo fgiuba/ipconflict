@@ -41,3 +41,9 @@ A subnet can be specified in several ways:
 * IP range `10.0.0.5-10.0.0.20`
 
 This tool works both with IPv4 and IPv6.
+
+## Exit Status
+
+* `0`, one or more conflicts found
+* `1`, no conflict found
+* `2`, aborted or invalid input
