@@ -51,7 +51,7 @@ def main():
     parser.add_argument('-p', '--print-conflicts', action='store_true',
                         help=u'print overlapping IP addresses')
     parser.add_argument('-q', '--quiet', action='store_true',
-                        help=u'show progress status')
+                        help=u'hide progress status')
     parser.add_argument('-V', '--version', action='store_true',
                         help=u'print ipconflict version')
 
