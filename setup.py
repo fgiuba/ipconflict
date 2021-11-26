@@ -10,7 +10,7 @@ else:
 
 setup(
     name='ipconflict',
-    version='0.5.0',
+    version='0.5.1',
     description='Check for conflicts between network subnets',
     long_description=long_description,
     long_description_content_type="text/markdown",
