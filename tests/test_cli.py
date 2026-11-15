@@ -1,5 +1,8 @@
+from importlib import metadata
+
 import pytest
 
+import ipconflict
 from ipconflict import main
 
 
@@ -35,6 +38,11 @@ def test_ip_only(capsys, flags):
         0,
         "10.0.0.5\n10.0.0.6\n10.0.0.6\n10.0.0.6\n",
     )
+
+
+def test_version(capsys):
+    assert run(capsys, "-V") == (0, f"ipconflict {metadata.version('ipconflict')}\n")
+    assert ipconflict.__version__ == metadata.version("ipconflict")
 
 
 def test_quiet_is_accepted(capsys):
