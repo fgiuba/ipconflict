@@ -1,0 +1,70 @@
+[project]
+name = "ipconflict"
+version = "0.5.1"
+description = "Check for conflicts between network subnets"
+readme = "README.md"
+license-files = ["LICENSE"]
+authors = [{ name = "Federico Giuba", email = "federico.giuba@gmail.com" }]
+requires-python = ">=3.11"
+keywords = ["network", "subnet", "cidr", "ip", "overlap", "conflict"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: System :: Networking",
+    "Typing :: Typed",
+]
+dependencies = [
+    "netaddr>=1.3.0",
+    "py-radix>=1.1.0",
+    "tqdm>=4.66",
+]
+
+[project.urls]
+Homepage = "https://github.com/fgiuba/ipconflict"
+Repository = "https://github.com/fgiuba/ipconflict"
+Issues = "https://github.com/fgiuba/ipconflict/issues"
+
+[project.scripts]
+ipconflict = "ipconflict:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "ruff>=0.17",
+    "ty>=0.0.104",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
+]
