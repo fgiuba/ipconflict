@@ -1,11 +1,10 @@
+import heapq
 import os
 import sys
 from collections.abc import Sequence
 
-import radix
-from netaddr import IPRange, IPSet
+from netaddr import IPAddress, IPNetwork, IPRange, IPSet
 from netaddr.core import AddrFormatError
-from tqdm import tqdm
 
 Conflict = tuple[str, str, IPSet]
 """A conflict: (earlier subnet, later subnet, overlapping addresses)."""
@@ -19,15 +18,27 @@ class InvalidSubnetError(ValueError):
         self.subnet = subnet
 
 
-def get_ip_set(subnet: str) -> IPSet:
+def _parse_block(subnet: str) -> tuple[int, int, int]:
+    """Return ``(ip_version, first, last)`` of the contiguous address block ``subnet`` covers."""
     try:
-        return IPSet([subnet])
+        network = IPNetwork(subnet)
+        return network.version, network.first, network.last
     except (AddrFormatError, ValueError):
-        try:
-            start, end = subnet.split("-")
-            return IPSet(IPRange(start, end))
-        except (AddrFormatError, ValueError):
-            raise InvalidSubnetError(subnet) from None
+        pass
+    try:
+        start, end = subnet.split("-")
+        address_range = IPRange(start, end)
+    except (AddrFormatError, ValueError):
+        raise InvalidSubnetError(subnet) from None
+    return address_range.version, address_range.first, address_range.last
+
+
+def _block_to_ip_set(version: int, first: int, last: int) -> IPSet:
+    return IPSet(IPRange(IPAddress(first, version), IPAddress(last, version)))
+
+
+def get_ip_set(subnet: str) -> IPSet:
+    return _block_to_ip_set(*_parse_block(subnet))
 
 
 def parse_subnet_data(data: str) -> list[str]:
@@ -52,18 +63,31 @@ def parse_subnet_file(path: str) -> list[str]:
 
 
 def check_conflicts(subnets: Sequence[str], quiet: bool = True) -> list[Conflict]:
-    conflicts: list[Conflict] = []
-    rtree = radix.Radix()
-    for idx, subnet_a in tqdm(enumerate(subnets), unit="subnet", total=len(subnets), disable=quiet):
-        set_a = get_ip_set(subnet_a)
-        matched = False
-        for cidr in set_a.iter_cidrs():
-            cidr = str(cidr)
-            if not matched and (rtree.search_covered(cidr) or rtree.search_covering(cidr)):
-                for subnet_b in subnets[:idx]:
-                    overlapping_ips = set_a & get_ip_set(subnet_b)
-                    if overlapping_ips:
-                        conflicts.append((subnet_b, subnet_a, overlapping_ips))
-                matched = True
-            rtree.add(cidr)
-    return conflicts
+    """Find every pair of overlapping subnet definitions.
+
+    Each definition (CIDR, single address or ``start-end`` range) covers one contiguous block of
+    addresses. Blocks are sorted by first address and swept once, keeping the blocks that are
+    still open in a min-heap keyed by last address: every block still open when a new one
+    starts overlaps it. This takes O(n log n + k) time for n definitions and k conflicts.
+
+    Conflicts are ordered by the input position of the later definition, then of the earlier
+    one. ``quiet`` is ignored; it is only kept for backward compatibility.
+    """
+    blocks = sorted((*_parse_block(subnet), idx) for idx, subnet in enumerate(subnets))
+    overlaps: list[tuple[int, int, int, int, int]] = []  # (later, earlier, version, first, last)
+    open_blocks: list[tuple[int, int]] = []  # min-heap of (last, idx)
+    current_version = None
+    for version, first, last, idx in blocks:
+        if version != current_version:  # IPv4 and IPv6 blocks never overlap
+            open_blocks, current_version = [], version
+        while open_blocks and open_blocks[0][0] < first:
+            heapq.heappop(open_blocks)
+        for open_last, open_idx in open_blocks:
+            later, earlier = max(idx, open_idx), min(idx, open_idx)
+            overlaps.append((later, earlier, version, first, min(last, open_last)))
+        heapq.heappush(open_blocks, (last, idx))
+    overlaps.sort()
+    return [
+        (subnets[earlier], subnets[later], _block_to_ip_set(version, first, last))
+        for later, earlier, version, first, last in overlaps
+    ]

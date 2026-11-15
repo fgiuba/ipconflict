@@ -63,7 +63,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "-p", "--print-conflicts", action="store_true", help="print overlapping IP addresses"
     )
-    parser.add_argument("-q", "--quiet", action="store_true", help="hide progress status")
+    # There is no progress bar any more: -q is accepted (and hidden) only so that existing
+    # scripts keep working.
+    parser.add_argument("-q", "--quiet", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "-V",
         "--version",
@@ -83,7 +85,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         print("must specify at least 2 subnets")
         sys.exit(2)
     try:
-        conflicts = check_conflicts(subnets, args.quiet)
+        conflicts = check_conflicts(subnets)
         print_results(conflicts, args.print_conflicts, args.ip_only)
     except InvalidSubnetError as exc:
         print(f"error: {exc}")
