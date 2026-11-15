@@ -11,16 +11,23 @@ Conflict = tuple[str, str, IPSet]
 """A conflict: (earlier subnet, later subnet, overlapping addresses)."""
 
 
+class InvalidSubnetError(ValueError):
+    """A subnet definition is neither a CIDR, a single address nor a ``start-end`` range."""
+
+    def __init__(self, subnet: str) -> None:
+        super().__init__(f"invalid subnet format {subnet}")
+        self.subnet = subnet
+
+
 def get_ip_set(subnet: str) -> IPSet:
     try:
         return IPSet([subnet])
-    except AddrFormatError:
+    except (AddrFormatError, ValueError):
         try:
             start, end = subnet.split("-")
             return IPSet(IPRange(start, end))
         except (AddrFormatError, ValueError):
-            print(f"error: invalid subnet format {subnet}")
-            sys.exit(2)
+            raise InvalidSubnetError(subnet) from None
 
 
 def parse_subnet_data(data: str) -> list[str]:

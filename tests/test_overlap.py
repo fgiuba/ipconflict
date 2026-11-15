@@ -2,7 +2,7 @@ import unittest
 
 from netaddr import IPSet
 
-from ipconflict.subnet import check_conflicts
+from ipconflict.subnet import InvalidSubnetError, check_conflicts
 
 
 class NoOverlapTest(unittest.TestCase):
@@ -82,6 +82,23 @@ class OverlapTest(unittest.TestCase):
             ("10.0.0.0/24", "10.0.0.252-10.0.0.253", IPSet(["10.0.0.252/31"])),
         ]
         self.assertEqual(check_conflicts(subnets), result)
+
+
+class InvalidSubnetTest(unittest.TestCase):
+    def test_invalid_definitions_raise(self):
+        invalid = [
+            "foo",
+            "",
+            "10.0.0.0/33",
+            "10.0.0.0/8/8",
+            "10.0.0.5-10.0.0.1",
+            "10.0.0.1-::1",
+            "10.0.0.1-10.0.0.2-10.0.0.3",
+        ]
+        for subnet in invalid:
+            with self.subTest(subnet=subnet), self.assertRaises(InvalidSubnetError) as ctx:
+                check_conflicts(["10.0.0.0/24", subnet])
+            self.assertEqual(ctx.exception.subnet, subnet)
 
 
 if __name__ == "__main__":

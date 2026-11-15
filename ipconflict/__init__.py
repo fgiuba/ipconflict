@@ -6,7 +6,13 @@ from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _dist_version
 
-from ipconflict.subnet import Conflict, check_conflicts, parse_stdin_data, parse_subnet_file
+from ipconflict.subnet import (
+    Conflict,
+    InvalidSubnetError,
+    check_conflicts,
+    parse_stdin_data,
+    parse_subnet_file,
+)
 
 try:
     __version__ = _dist_version("ipconflict")
@@ -79,6 +85,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         conflicts = check_conflicts(subnets, args.quiet)
         print_results(conflicts, args.print_conflicts, args.ip_only)
+    except InvalidSubnetError as exc:
+        print(f"error: {exc}")
+        sys.exit(2)
     except KeyboardInterrupt:
         print("aborted\n")
         sys.exit(2)
