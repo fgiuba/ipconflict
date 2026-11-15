@@ -1,14 +1,18 @@
 # ipconflict
 
+[![CI](https://github.com/fgiuba/ipconflict/actions/workflows/ci.yml/badge.svg)](https://github.com/fgiuba/ipconflict/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/ipconflict.svg)](https://pypi.org/project/ipconflict/)
+[![Python versions](https://img.shields.io/pypi/pyversions/ipconflict.svg)](https://pypi.org/project/ipconflict/)
 [![Downloads](https://pepy.tech/badge/ipconflict)](https://pepy.tech/project/ipconflict)
-[![ipconflict](https://img.shields.io/badge/ipconflict-0.5.0-green.svg)](https://pypi.org/project/ipconflict/)
-[![Python version](https://img.shields.io/badge/python-2.6%20%7C%202.7%20%7C%203.4%20%7C%203.5%20%7C%203.6%20%7C%203.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
 
 Check if two or more network subnets are overlapping.
 
 ## Install
 
-`pip install ipconflict`
+Requires Python 3.11 or newer.
+
+* `uv tool install ipconflict` (or run it once with `uvx ipconflict ...`)
+* `pip install ipconflict`
 
 ## Quick Start
 
@@ -47,3 +51,17 @@ This tool works both with IPv4 and IPv6.
 * `0`, one or more conflicts found
 * `1`, no conflict found
 * `2`, aborted or invalid input
+
+## Development
+
+The project is managed with [uv](https://docs.astral.sh/uv/), linted and formatted with
+[Ruff](https://docs.astral.sh/ruff/) and type checked with [ty](https://docs.astral.sh/ty/).
+
+```sh
+uv sync                    # create .venv with runtime and dev dependencies
+uv run pytest              # run the test suite
+uv run ruff check          # lint
+uv run ruff format         # format
+uv run ty check            # type check
+uv run ipconflict --help   # run the CLI from the source tree
+```
