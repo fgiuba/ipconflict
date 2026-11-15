@@ -1,6 +1,6 @@
 [project]
 name = "ipconflict"
-version = "0.5.1"
+version = "0.6.0"
 description = "Check for conflicts between network subnets"
 readme = "README.md"
 license-files = ["LICENSE"]
