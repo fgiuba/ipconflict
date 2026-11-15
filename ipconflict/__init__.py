@@ -6,9 +6,10 @@ import argparse
 import sys
 
 from ipconflict.subnet import (
-    Conflict,
     InvalidSubnetError,
-    check_conflicts,
+    _address_lines,
+    _Conflicts,
+    _find_conflicts,
     parse_stdin_data,
     parse_subnet_file,
 )
@@ -16,7 +17,7 @@ from ipconflict.subnet import (
 TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Any
+    from typing import Any, TextIO
 
 
 epilog = """examples:
@@ -67,15 +68,34 @@ class _VersionAction(argparse.Action):
         parser.exit()
 
 
-def print_results(conflicts: Sequence[Conflict], print_conflicts: bool, ip_only: bool) -> None:
-    for subnet_a, subnet_b, overlapping_ips in conflicts:
-        if not ip_only:
-            print(f"conflict found: {subnet_a} <-> {subnet_b}")
-        if print_conflicts:
-            for ip in overlapping_ips:
-                print(ip)
+_CHUNK = 65536
+
+
+def _write_report(
+    out: TextIO,
+    subnets: Sequence[str],
+    conflicts: _Conflicts,
+    print_addresses: bool,
+    ip_only: bool,
+) -> None:
     if not conflicts:
-        print("no conflict found")
+        out.write("no conflict found\n")
+        return
+    if not print_addresses:  # build the lines in bulk, a chunk at a time to bound memory
+        pairs, bits = conflicts.pairs, conflicts.bits
+        mask = (1 << bits) - 1
+        for start in range(0, len(pairs), _CHUNK):
+            lines = [
+                f"conflict found: {subnets[pair & mask]} <-> {subnets[pair >> bits]}\n"
+                for pair in pairs[start : start + _CHUNK]
+            ]
+            out.write("".join(lines))
+        return
+    for earlier, later in conflicts:
+        if not ip_only:
+            out.write(f"conflict found: {subnets[earlier]} <-> {subnets[later]}\n")
+        for chunk in _address_lines(*conflicts.overlap(earlier, later)):
+            out.write(chunk)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -116,8 +136,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         print("must specify at least 2 subnets")
         sys.exit(2)
     try:
-        conflicts = check_conflicts(subnets)
-        print_results(conflicts, args.print_conflicts or args.ip_only, args.ip_only)
+        conflicts = _find_conflicts(subnets)
+        _write_report(
+            sys.stdout, subnets, conflicts, args.print_conflicts or args.ip_only, args.ip_only
+        )
     except InvalidSubnetError as exc:
         print(f"error: {exc}")
         sys.exit(2)

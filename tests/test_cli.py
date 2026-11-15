@@ -40,6 +40,20 @@ def test_ip_only(capsys, flags):
     )
 
 
+def test_ip_only_across_a_24_boundary(capsys):
+    assert run(capsys, "-o", "10.0.0.254-10.0.1.1", "10.0.0.0/16") == (
+        0,
+        "10.0.0.254\n10.0.0.255\n10.0.1.0\n10.0.1.1\n",
+    )
+
+
+def test_ip_only_ipv6(capsys):
+    assert run(capsys, "-o", "2001:db8::/126", "2001:db8::2-2001:db8::9", "::ffff:10.0.0.1") == (
+        0,
+        "2001:db8::2\n2001:db8::3\n",
+    )
+
+
 def test_version(capsys):
     assert run(capsys, "-V") == (0, f"ipconflict {metadata.version('ipconflict')}\n")
     assert ipconflict.__version__ == metadata.version("ipconflict")

@@ -1,3 +1,4 @@
+import gc
 import random
 import time
 import unittest
@@ -196,6 +197,19 @@ class InvalidSubnetTest(unittest.TestCase):
             with self.subTest(subnet=subnet), self.assertRaises(InvalidSubnetError) as ctx:
                 check_conflicts(["10.0.0.0/24", subnet])
             self.assertEqual(ctx.exception.subnet, subnet)
+
+
+class GarbageCollectorTest(unittest.TestCase):
+    def test_state_is_restored(self):
+        subnets = ["10.0.0.0/24", "10.0.0.1"]
+        was_enabled = gc.isenabled()
+        try:
+            for enabled in (True, False):
+                (gc.enable if enabled else gc.disable)()
+                self.assertEqual(len(check_conflicts(subnets)), 1)
+                self.assertEqual(gc.isenabled(), enabled)
+        finally:
+            (gc.enable if was_enabled else gc.disable)()
 
 
 if __name__ == "__main__":
