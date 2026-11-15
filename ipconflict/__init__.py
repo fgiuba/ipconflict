@@ -1,15 +1,20 @@
-#!/usr/bin/env python
+"""Check for conflicts between network subnets."""
 
 import argparse
 import sys
+from collections.abc import Sequence
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _dist_version
 
-from ipconflict.subnet import check_conflicts, parse_stdin_data, parse_subnet_file
+from ipconflict.subnet import Conflict, check_conflicts, parse_stdin_data, parse_subnet_file
+
+try:
+    __version__ = _dist_version("ipconflict")
+except PackageNotFoundError:  # running from a source tree that is not installed
+    __version__ = "unknown"
 
 
-version = u'0.5.1'
-
-
-epilog = u"""examples:
+epilog = """examples:
   ipconflict 10.0.0.0/24 10.0.0.1/16
   ipconflict 10.0.0.0/24 10.0.0.20-10.0.0.25
   ipconflict -f my-subnets.txt
@@ -22,69 +27,63 @@ exit status:
 """
 
 
-def print_results(conflicts, print_conflicts, ip_only):
+def print_results(conflicts: Sequence[Conflict], print_conflicts: bool, ip_only: bool) -> None:
     for subnet_a, subnet_b, overlapping_ips in conflicts:
         if not ip_only:
-            print(u'conflict found: {} <-> {}'.format(subnet_a, subnet_b))
+            print(f"conflict found: {subnet_a} <-> {subnet_b}")
         if print_conflicts:
             for ip in overlapping_ips:
                 print(ip)
     if not conflicts:
-        print(u'no conflict found')
+        print("no conflict found")
 
 
-def main():
-
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description=u'Check for conflicts between subnets.',
+        description="Check for conflicts between subnets.",
         epilog=epilog,
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument('subnets', nargs='*',
-                        help=u'list of subnets to be checked')
-    parser.add_argument('-f', '--from-file', default='',
-                        help=u'load subnet definitions from file (one per line)')
-    parser.add_argument('-i', '--from-stdin', action='store_true',
-                        help=u'load subnet definitions from stdin')
-    parser.add_argument('-o', '--ip-only', action='store_true',
-                        help=u'print only the overlapping IP addresses')
-    parser.add_argument('-p', '--print-conflicts', action='store_true',
-                        help=u'print overlapping IP addresses')
-    parser.add_argument('-q', '--quiet', action='store_true',
-                        help=u'hide progress status')
-    parser.add_argument('-V', '--version', action='store_true',
-                        help=u'print ipconflict version')
+    parser.add_argument("subnets", nargs="*", help="list of subnets to be checked")
+    parser.add_argument(
+        "-f", "--from-file", default="", help="load subnet definitions from file (one per line)"
+    )
+    parser.add_argument(
+        "-i", "--from-stdin", action="store_true", help="load subnet definitions from stdin"
+    )
+    parser.add_argument(
+        "-o", "--ip-only", action="store_true", help="print only the overlapping IP addresses"
+    )
+    parser.add_argument(
+        "-p", "--print-conflicts", action="store_true", help="print overlapping IP addresses"
+    )
+    parser.add_argument("-q", "--quiet", action="store_true", help="hide progress status")
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"ipconflict {__version__}",
+        help="print ipconflict version",
+    )
 
-    args = parser.parse_args(sys.argv[1:])
-    if not args:
-        parser.print_usage()
-        sys.exit(0)
+    args = parser.parse_args(argv)
 
-    if args.version:
-        print(u'ipconflict {}'.format(version))
-        sys.exit(0)
-
-    subnets = args.subnets
+    subnets: list[str] = args.subnets
     if args.from_stdin:
         subnets += parse_stdin_data()
-    subnet_file = args.from_file
-    if subnet_file:
-        subnets += parse_subnet_file(subnet_file)
+    if args.from_file:
+        subnets += parse_subnet_file(args.from_file)
     if len(subnets) < 2:
-        print('must specify at least 2 subnets')
+        print("must specify at least 2 subnets")
         sys.exit(2)
     try:
         conflicts = check_conflicts(subnets, args.quiet)
         print_results(conflicts, args.print_conflicts, args.ip_only)
     except KeyboardInterrupt:
-        print('aborted\n')
+        print("aborted\n")
         sys.exit(2)
-    else:
-        if conflicts:
-            sys.exit(0)
-        else:
-            sys.exit(1)
+    sys.exit(0 if conflicts else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
