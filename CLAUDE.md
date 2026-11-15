@@ -19,7 +19,7 @@ uv run pytest tests/test_overlap.py::OverlapTest::test_two_subnets   # single te
 uv run --python 3.11 pytest               # test against a specific interpreter
 uv run ruff check --fix && uv run ruff format
 uv run ty check
-uv run ipconflict -q -p 10.0.0.0/24 10.0.0.5-10.0.0.6   # or: uv run python -m ipconflict ...
+uv run ipconflict -p 10.0.0.0/24 10.0.0.5-10.0.0.6      # or: uv run python -m ipconflict ...
 uv build                                  # sdist + wheel (uv_build backend)
 uv version --bump minor                   # bump the version in pyproject.toml
 ```
@@ -33,20 +33,27 @@ dependencies and commit `uv.lock`. The test matrix is CPython 3.11–3.15; keep 
 - `ipconflict/__init__.py` — the CLI (`main`, entry point `ipconflict:main`; `__main__.py`
   enables `python -m ipconflict`). `__version__` is read from installed metadata: the only
   source of truth for the version is `pyproject.toml`.
-- `ipconflict/subnet.py` — input parsing and `check_conflicts(subnets, quiet)`, the core.
-  - `get_ip_set` parses one definition into a `netaddr.IPSet` (CIDR/IP first, then `a-b` range).
-    On invalid input it prints an error and calls `sys.exit(2)` itself, i.e. library code exits.
-  - `check_conflicts` inserts each subnet's CIDR blocks into a `py-radix` tree; when a subnet
-    hits an existing prefix (covered or covering), it intersects it with **every** earlier
-    subnet, re-parsing each one. A `tqdm` progress bar is shown unless `quiet`.
+- `ipconflict/subnet.py` — input parsing and `check_conflicts`, the core. The only runtime
+  dependency is `netaddr`.
+  - `_parse_block` turns a definition into `(ip_version, first, last)`: every accepted format
+    (CIDR via `IPNetwork`, then `a-b` via `IPRange`) is one contiguous block of addresses.
+    Invalid input raises `InvalidSubnetError` (a `ValueError`); the CLI catches it and exits 2.
+    Library code never calls `sys.exit`.
+  - `check_conflicts` sorts the blocks and sweeps them once with a min-heap of the blocks still
+    open (keyed by last address), separately per IP version: O(n log n + k). The overlap of a
+    pair is always a single range, turned into an `IPSet` only for the result. Do not
+    reintroduce pairwise comparison of all subnets: `tests/test_overlap.py::ScalingTest`
+    guards the 1-supernet-plus-20k-subnets case, which was quadratic before.
+  - Its `quiet` parameter and the CLI's `-q` are no-ops kept for backward compatibility.
 - Build backend is `uv_build` with a flat layout (`[tool.uv.build-backend] module-root = ""`),
   not `src/`.
 
 ## Contracts to preserve
 
 - `check_conflicts` returns `list[tuple[earlier, later, IPSet]]` ordered by the later subnet's
-  input position, then the earlier one's; the original strings are returned verbatim. Tests
-  assert exact lists, so ordering and `IPSet` contents are part of the API.
+  input position, then the earlier one's (the sweep sorts its pairs back into this order); the
+  original strings are returned verbatim. Tests assert exact lists, and
+  `BruteForceComparisonTest` checks random IPv4/IPv6 inputs against a pairwise `IPSet` oracle.
 - Exit codes are deliberately grep-like and documented in the README and `--help` epilog:
   `0` conflicts found, `1` no conflict, `2` aborted/invalid input.
 
