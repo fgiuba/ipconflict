@@ -58,7 +58,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         "-i", "--from-stdin", action="store_true", help="load subnet definitions from stdin"
     )
     parser.add_argument(
-        "-o", "--ip-only", action="store_true", help="print only the overlapping IP addresses"
+        "-o",
+        "--ip-only",
+        action="store_true",
+        help="print only the overlapping IP addresses (implies -p)",
     )
     parser.add_argument(
         "-p", "--print-conflicts", action="store_true", help="print overlapping IP addresses"
@@ -86,7 +89,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         sys.exit(2)
     try:
         conflicts = check_conflicts(subnets)
-        print_results(conflicts, args.print_conflicts, args.ip_only)
+        print_results(conflicts, args.print_conflicts or args.ip_only, args.ip_only)
     except InvalidSubnetError as exc:
         print(f"error: {exc}")
         sys.exit(2)
