@@ -62,9 +62,13 @@ dependencies and commit `uv.lock`. The test matrix is CPython 3.11–3.15; keep 
 - `check_conflicts` returns `list[tuple[earlier, later, IPSet]]` ordered by the later subnet's
   input position, then the earlier one's (the sweep sorts its pairs back into this order); the
   original strings are returned verbatim. Tests assert exact lists, and
-  `BruteForceComparisonTest` checks random IPv4/IPv6 inputs against a pairwise `IPSet` oracle.
+  `BruteForceComparisonTest` checks random IPv4/IPv6 inputs against a pairwise `IPSet` oracle
+  (`SweepTest` compares the sweep alone with a pairwise check, on larger inputs).
+- The CLI prints exactly what printing the results of `check_conflicts` would, although it never
+  builds them: `tests/test_cli.py::test_output_matches_the_library` checks it on random inputs.
 - The accepted syntax and the `-p` address format are netaddr's: a fast path may only take a
-  shortcut to netaddr's result, never change what is accepted or printed.
+  shortcut to netaddr's result, never change what is accepted or printed. Invalid input must
+  only ever raise `InvalidSubnetError`: anything else would crash the CLI with exit status 1.
 - Exit codes are deliberately grep-like and documented in the README and `--help` epilog:
   `0` conflicts found, `1` no conflict, `2` aborted/invalid input.
 

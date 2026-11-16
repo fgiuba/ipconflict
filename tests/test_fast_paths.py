@@ -1,5 +1,6 @@
 """The fast paths must behave exactly like netaddr, which defines the accepted syntax."""
 
+import importlib.util
 import random
 import subprocess
 import sys
@@ -33,7 +34,7 @@ EDGE_CASES = [
 def outcome(parse, text):
     try:
         return parse(text)
-    except Exception as exc:  # both must fail the same way: InvalidSubnetError or netaddr's error
+    except Exception as exc:
         return type(exc).__name__
 
 
@@ -66,20 +67,39 @@ def mutate(rnd: random.Random, text: str) -> str:
     return "".join(chars)
 
 
+def load_subnet_module():
+    """Run a fresh copy of ipconflict.subnet, to see which fast paths it turns on."""
+    spec = importlib.util.spec_from_file_location("ipconflict_subnet_copy", subnet.__file__)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class ParseBlockTest(unittest.TestCase):
+    def check(self, text):
+        result = outcome(_parse_block, text)
+        self.assertEqual(result, outcome(_parse_block_netaddr, text), text)
+        if isinstance(result, str):  # any other error would crash the CLI with exit status 1
+            self.assertEqual(result, "InvalidSubnetError", text)
+
     def test_edge_cases(self):
         for text in EDGE_CASES:
             with self.subTest(text=text):
-                self.assertEqual(outcome(_parse_block, text), outcome(_parse_block_netaddr, text))
+                self.check(text)
 
     def test_random_and_mutated_definitions(self):
         rnd = random.Random(20261116)
         for _ in range(10_000):
             text = random_definition(rnd)
-            for candidate in (text, mutate(rnd, text)):
-                expected = outcome(_parse_block_netaddr, candidate)
-                if outcome(_parse_block, candidate) != expected:
-                    self.fail(f"{candidate!r}: {outcome(_parse_block, candidate)} != {expected}")
+            self.check(text)
+            self.check(mutate(rnd, text))
+
+    def test_arbitrary_strings(self):
+        rnd = random.Random(20261117)
+        alphabet = "0123456789abcdefABCDEF.:/-% +_x\x00\t\n[]" + chr(0x0662) + chr(0xFF11)
+        for _ in range(10_000):
+            self.check("".join(rnd.choices(alphabet, k=rnd.randint(0, 24))))
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "glibc and musl qualify, others may not")
     def test_fast_path_is_on(self):
@@ -91,6 +111,52 @@ class ParseBlockTest(unittest.TestCase):
         with mock.patch.object(subnet, "_parse_block_netaddr", side_effect=AssertionError):
             for text in common:
                 _parse_block(text)
+
+
+class FastPathSwitchTest(unittest.TestCase):
+    """Each fast path must be off wherever it could disagree with netaddr."""
+
+    def test_ipv4_is_off_on_windows_and_cygwin(self):
+        for platform in ("win32", "cygwin"):  # netaddr does not use inet_pton for IPv4 there
+            with self.subTest(platform=platform):
+                with mock.patch.object(sys, "platform", platform):
+                    module = load_subnet_module()
+                self.assertFalse(module._FAST_IPV4)
+                self.assertEqual(module._FAST_IPV6, subnet._FAST_IPV6)
+
+    def test_ipv4_is_off_where_inet_pton_accepts_leading_zeros(self):
+        for lenient in ("01.2.3.4", "1.2.3.04"):  # netaddr rejects both
+
+            def inet_pton(family, text, lenient=lenient):
+                return bytes(4) if text == lenient else subnet.inet_pton(family, text)
+
+            with self.subTest(lenient=lenient):
+                with mock.patch("_socket.inet_pton", inet_pton):
+                    module = load_subnet_module()
+                self.assertFalse(module._FAST_IPV4)
+
+    def test_ipv6_is_off_without_ipv6_support(self):
+        with mock.patch("_socket.has_ipv6", False):
+            module = load_subnet_module()
+        self.assertFalse(module._FAST_IPV6)
+        self.assertEqual(module._FAST_IPV4, subnet._FAST_IPV4)
+
+    @unittest.skipUnless(FAST_PATHS, "the fast path is turned off on this platform")
+    def test_each_switch_covers_one_ip_version(self):
+        ipv4 = ["10.0.0.0/8", "10.0.0.1", "10.0.0.1-10.0.0.9"]
+        ipv6 = ["2001:db8::/32", "::1", "::-::ff"]
+        for switch, off, on in (("_FAST_IPV4", ipv4, ipv6), ("_FAST_IPV6", ipv6, ipv4)):
+            with (
+                self.subTest(switch=switch),
+                mock.patch.object(subnet, switch, False),
+                mock.patch.object(subnet, "inet_pton", wraps=subnet.inet_pton) as inet_pton,
+            ):
+                for text in off:
+                    self.assertEqual(_parse_block(text), _parse_block_netaddr(text))
+                inet_pton.assert_not_called()
+                for text in on:
+                    _parse_block(text)
+                inet_pton.assert_called()
 
 
 class AddressLinesTest(unittest.TestCase):
@@ -132,6 +198,13 @@ class AddressLinesTest(unittest.TestCase):
             first = rnd.getrandbits(128)
             self.check(6, first, min(first + rnd.randrange(300), top))
 
+    def test_ipv6_without_ipv6_support(self):
+        mapped = int(IPAddress("::ffff:10.0.0.0"))
+        top = (1 << 128) - 1
+        with mock.patch.object(subnet, "_FAST_IPV6", False):  # netaddr writes the addresses
+            for first, last in [(0, 20), (mapped - 5, mapped + 5), (top - 3, top)]:
+                self.check(6, first, last)
+
 
 class IPSetFactoryTest(unittest.TestCase):
     def test_matches_netaddr_ranges(self):
@@ -154,16 +227,19 @@ class IPSetFactoryTest(unittest.TestCase):
 class StartupTest(unittest.TestCase):
     @unittest.skipUnless(FAST_PATHS, "the fast path is turned off on this platform")
     def test_cli_does_not_import_heavy_modules(self):
-        # Importing netaddr and importlib.metadata used to take 2/3 of a typical run.
+        # Importing netaddr and importlib.metadata used to take 2/3 of a typical run; typing and
+        # socket are not needed either. Whatever the interpreter itself imports does not count.
         code = (
             "import sys\n"
+            "heavy = ('importlib.metadata', 'netaddr', 'socket', 'typing')\n"
+            "preloaded = set(sys.modules)\n"
             "from ipconflict import main\n"
             "try:\n"
             "    main(sys.argv[1:])\n"
             "except SystemExit:\n"
             "    pass\n"
-            "heavy = ('netaddr', 'importlib.metadata')\n"
-            "print(sorted(name for name in heavy if name in sys.modules), file=sys.stderr)\n"
+            "imported = [name for name in heavy if name in sys.modules and name not in preloaded]\n"
+            "print(imported, file=sys.stderr)\n"
         )
         args = ["-p", "10.0.0.0/30", "10.0.0.1-10.0.0.2", "2001:db8::/127", "2001:db8::1"]
         command = [sys.executable, "-c", code, *args]
