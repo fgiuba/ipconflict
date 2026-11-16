@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from ipconflict.subnet import (
@@ -98,6 +99,13 @@ def _write_report(
             out.write(chunk)
 
 
+def _discard_stdout() -> None:
+    """Send what is left of stdout to /dev/null: Python flushes it at exit, which would fail too."""
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())
+    os.close(devnull)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Check for conflicts between subnets.",
@@ -137,17 +145,27 @@ def main(argv: Sequence[str] | None = None) -> None:
         sys.exit(2)
     try:
         conflicts = _find_conflicts(subnets)
+        status = 0 if conflicts else 1  # whatever happens to the report from now on
         if sys.stdout is not None:  # None when started with stdout closed: print() skips it too
             _write_report(
                 sys.stdout, subnets, conflicts, args.print_conflicts or args.ip_only, args.ip_only
             )
+            sys.stdout.flush()  # so that a write error shows up here, not at exit
     except InvalidSubnetError as exc:
         print(f"error: {exc}")
+        sys.exit(2)
+    except BrokenPipeError:
+        # The reader went away, as in "ipconflict -p ... | head". That is no error: the check is
+        # complete, and the exit status still tells its result.
+        _discard_stdout()
+    except OSError as exc:  # any other write error, such as a full disk
+        _discard_stdout()
+        print(f"error: cannot write output: {exc}", file=sys.stderr)
         sys.exit(2)
     except KeyboardInterrupt:
         print("aborted\n")
         sys.exit(2)
-    sys.exit(0 if conflicts else 1)
+    sys.exit(status)
 
 
 if __name__ == "__main__":

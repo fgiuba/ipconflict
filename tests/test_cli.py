@@ -1,4 +1,6 @@
+import errno
 import io
+import os
 import random
 import shlex
 import subprocess
@@ -233,6 +235,36 @@ def test_closed_stdout(argv, status):
     command = shlex.join([sys.executable, "-m", "ipconflict", *argv]) + " >&-"
     result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True, check=False)
     assert (result.returncode, result.stderr) == (status, "")
+
+
+@pytest.mark.parametrize(
+    ("argv", "status"),
+    [
+        (["10.0.0.0/24", "10.0.0.1"], 0),
+        (["10.0.0.0/24", "10.0.1.0/24"], 1),
+        (["-p", "10.0.0.0/8", "10.0.0.0/12"], 0),  # a million addresses: more than a pipe holds
+    ],
+)
+def test_reader_going_away(argv, status):
+    # As in ipconflict ... | head: no error, and the exit status still tells the result
+    command = [sys.executable, "-m", "ipconflict", *argv]
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        assert process.stdout is not None and process.stderr is not None
+        process.stdout.close()  # before ipconflict writes anything
+        errors = process.stderr.read()
+    assert (process.returncode, errors) == (status, b"")
+
+
+@pytest.mark.skipif(not os.path.exists("/dev/full"), reason="needs /dev/full")
+@pytest.mark.parametrize("argv", [["10.0.0.0/24", "10.0.0.1"], ["-p", "10.0.0.0/8", "10.0.0.0/12"]])
+def test_write_error(argv):
+    command = [sys.executable, "-m", "ipconflict", *argv]
+    with open("/dev/full", "w") as full:  # every write fails: no space left on device
+        result = subprocess.run(
+            command, stdout=full, stderr=subprocess.PIPE, text=True, check=False
+        )
+    error = OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+    assert (result.returncode, result.stderr) == (2, f"error: cannot write output: {error}\n")
 
 
 # Options and entry points
