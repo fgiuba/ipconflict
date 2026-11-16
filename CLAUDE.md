@@ -70,7 +70,10 @@ dependencies and commit `uv.lock`. The test matrix is CPython 3.11–3.15; keep 
   shortcut to netaddr's result, never change what is accepted or printed. Invalid input must
   only ever raise `InvalidSubnetError`: anything else would crash the CLI with exit status 1.
 - Exit codes are deliberately grep-like and documented in the README and `--help` epilog:
-  `0` conflicts found, `1` no conflict, `2` aborted/invalid input.
+  `0` conflicts found, `1` no conflict, `2` aborted/invalid input. They answer the check even
+  if the output is lost: a reader that stops early (`| head`) or a closed stdout is no error,
+  while any other write error is reported on stderr with `2`. Never let an exception escape
+  `main`: Python's own exit status 1 would mean "no conflict".
 
 ## Repository conventions
 
