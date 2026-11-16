@@ -137,9 +137,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         sys.exit(2)
     try:
         conflicts = _find_conflicts(subnets)
-        _write_report(
-            sys.stdout, subnets, conflicts, args.print_conflicts or args.ip_only, args.ip_only
-        )
+        if sys.stdout is not None:  # None when started with stdout closed: print() skips it too
+            _write_report(
+                sys.stdout, subnets, conflicts, args.print_conflicts or args.ip_only, args.ip_only
+            )
     except InvalidSubnetError as exc:
         print(f"error: {exc}")
         sys.exit(2)

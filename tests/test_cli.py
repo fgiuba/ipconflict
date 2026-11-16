@@ -1,5 +1,6 @@
 import io
 import random
+import shlex
 import subprocess
 import sys
 from importlib import metadata
@@ -217,6 +218,21 @@ def test_keyboard_interrupt(capsys, monkeypatch):
     except KeyboardInterrupt:  # left alone, it would stop the whole test session
         pytest.fail("KeyboardInterrupt was not handled")
     assert result == (2, "aborted\n\n")
+
+
+# Output that cannot be written
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="needs a POSIX shell")
+@pytest.mark.parametrize(
+    ("argv", "status"),
+    [(["10.0.0.0/24", "10.0.0.1"], 0), (["10.0.0.0/24", "10.0.1.0/24"], 1)],
+)
+def test_closed_stdout(argv, status):
+    # ipconflict ... >&-: only the exit status is left
+    command = shlex.join([sys.executable, "-m", "ipconflict", *argv]) + " >&-"
+    result = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True, check=False)
+    assert (result.returncode, result.stderr) == (status, "")
 
 
 # Options and entry points
