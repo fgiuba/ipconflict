@@ -1,10 +1,12 @@
+import gc
 import random
 import time
 import unittest
+from unittest import mock
 
 from netaddr import IPAddress, IPNetwork, IPRange, IPSet
 
-from ipconflict.subnet import InvalidSubnetError, check_conflicts
+from ipconflict.subnet import InvalidSubnetError, _find_conflicts, check_conflicts, get_ip_set
 
 
 class NoOverlapTest(unittest.TestCase):
@@ -35,6 +37,14 @@ class NoOverlapTest(unittest.TestCase):
     def test_multiple_types(self):
         subnets = ["10.0.0.1", "172.16.0.1/24", "192.168.0.1-192.168.0.254"]
         self.assertEqual(check_conflicts(subnets), [])
+
+    def test_adjacent_blocks(self):
+        subnets = ["10.0.0.0-10.0.0.4", "10.0.0.5-10.0.0.9", "10.0.0.10/31", "10.0.0.12"]
+        self.assertEqual(check_conflicts(subnets), [])
+
+    def test_fewer_than_two_subnets(self):
+        self.assertEqual(check_conflicts([]), [])
+        self.assertEqual(check_conflicts(["10.0.0.0/8"]), [])
 
 
 class OverlapTest(unittest.TestCase):
@@ -84,6 +94,60 @@ class OverlapTest(unittest.TestCase):
             ("10.0.0.0/24", "10.0.0.252-10.0.0.253", IPSet(["10.0.0.252/31"])),
         ]
         self.assertEqual(check_conflicts(subnets), result)
+
+    def test_blocks_sharing_one_address(self):
+        subnets = ["10.0.0.0-10.0.0.5", "10.0.0.5-10.0.0.9", "10.0.0.9/32"]
+        result = [
+            ("10.0.0.0-10.0.0.5", "10.0.0.5-10.0.0.9", IPSet(["10.0.0.5/32"])),
+            ("10.0.0.5-10.0.0.9", "10.0.0.9/32", IPSet(["10.0.0.9/32"])),
+        ]
+        self.assertEqual(check_conflicts(subnets), result)
+
+    def test_edges_of_the_address_space(self):
+        top = "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+        subnets = [
+            *("0.0.0.0", "255.255.255.255", "0.0.0.0/1", "128.0.0.0/1"),
+            *("::", top, "::/1", "8000::/1"),
+        ]
+        result = [
+            ("0.0.0.0", "0.0.0.0/1", IPSet(["0.0.0.0/32"])),
+            ("255.255.255.255", "128.0.0.0/1", IPSet(["255.255.255.255/32"])),
+            ("::", "::/1", IPSet(["::/128"])),
+            (top, "8000::/1", IPSet([f"{top}/128"])),
+        ]
+        self.assertEqual(check_conflicts(subnets), result)
+
+
+class InputTest(unittest.TestCase):
+    def test_netmasks_and_hostmasks(self):
+        subnets = [
+            *("10.0.0.7/255.255.255.0", "10.0.0.128/0.0.0.127"),
+            *("2001:db8::1/ffff:ffff::", "2001:db8::5"),
+        ]
+        result = [
+            ("10.0.0.7/255.255.255.0", "10.0.0.128/0.0.0.127", IPSet(["10.0.0.128/25"])),
+            ("2001:db8::1/ffff:ffff::", "2001:db8::5", IPSet(["2001:db8::5/128"])),
+        ]
+        self.assertEqual(check_conflicts(subnets), result)
+
+    def test_definitions_are_returned_verbatim(self):
+        subnets = ["2001:DB8::1/64", "2001:db8:0:0:0:0:0:5", "::FFFF:10.0.0.1", "::ffff:a00:1"]
+        result = [
+            ("2001:DB8::1/64", "2001:db8:0:0:0:0:0:5", IPSet(["2001:db8::5/128"])),
+            ("::FFFF:10.0.0.1", "::ffff:a00:1", IPSet(["::ffff:10.0.0.1/128"])),
+        ]
+        self.assertEqual(check_conflicts(subnets), result)
+
+    def test_any_sequence(self):
+        result = [("10.0.0.0/24", "10.0.0.1", IPSet(["10.0.0.1/32"]))]
+        self.assertEqual(check_conflicts(("10.0.0.0/24", "10.0.0.1")), result)
+
+    def test_quiet_is_ignored(self):
+        subnets = ["10.0.0.0/24", "10.0.0.1"]
+        result = [("10.0.0.0/24", "10.0.0.1", IPSet(["10.0.0.1/32"]))]
+        for quiet in (False, True):
+            self.assertEqual(check_conflicts(subnets, quiet), result)
+            self.assertEqual(check_conflicts(subnets, quiet=quiet), result)
 
 
 class IPv6Test(unittest.TestCase):
@@ -137,8 +201,11 @@ def random_definition(rnd: random.Random) -> str:
 
     kind = rnd.random()
     start = base.first + rnd.randrange(base.size)
-    if kind < 0.4:  # host bits are usually set
-        return f"{address(start)}/{rnd.randint(base.prefixlen - 2, max_prefixlen)}"
+    prefixlen = rnd.randint(base.prefixlen - 2, max_prefixlen)
+    if kind < 0.3:  # host bits are usually set
+        return f"{address(start)}/{prefixlen}"
+    if kind < 0.4:  # a netmask: parsed by netaddr, not by the fast path
+        return f"{address(start)}/{IPNetwork((start, prefixlen), base.version).netmask}"
     if kind < 0.7:
         return str(address(start))
     return f"{address(start)}-{address(rnd.randint(start, min(base.last, start + 300)))}"
@@ -168,6 +235,46 @@ class BruteForceComparisonTest(unittest.TestCase):
                 self.assertEqual(check_conflicts(subnets), self.brute_force(subnets))
 
 
+class SweepTest(unittest.TestCase):
+    def test_matches_a_pairwise_comparison(self):
+        # Inputs too large for the brute force above. Block sizes follow a Pareto distribution:
+        # most blocks are small, a few are nested in each other or cover the rest. The smaller
+        # the space, the denser the overlaps and the more often blocks start or end together.
+        rnd = random.Random(20261117)
+        offsets = {4: int(IPAddress("10.0.0.0")), 6: int(IPAddress("2001:db8::"))}
+        for _ in range(30):
+            space = 1 << rnd.choice((6, 10, 16))
+            blocks = []
+            for _ in range(rnd.randint(50, 300)):
+                version = rnd.choice((4, 6))
+                first = rnd.randrange(space)
+                last = min(first + int(rnd.paretovariate(0.5)) - 1, space - 1)
+                blocks.append((version, offsets[version] + first, offsets[version] + last))
+            subnets = [
+                f"{IPAddress(first, version)}-{IPAddress(last, version)}"
+                for version, first, last in blocks
+            ]
+            pairs = [
+                (earlier, later)
+                for later, (version, first, last) in enumerate(blocks)
+                for earlier in range(later)
+                if blocks[earlier][0] == version
+                and blocks[earlier][1] <= last
+                and first <= blocks[earlier][2]
+            ]
+            overlaps = [
+                (
+                    blocks[later][0],
+                    max(blocks[earlier][1], blocks[later][1]),
+                    min(blocks[earlier][2], blocks[later][2]),
+                )
+                for earlier, later in pairs
+            ]
+            conflicts = _find_conflicts(subnets)
+            self.assertEqual(list(conflicts), pairs)
+            self.assertEqual([conflicts.overlap(*pair) for pair in pairs], overlaps)
+
+
 class ScalingTest(unittest.TestCase):
     def test_supernet_followed_by_its_subnets(self):
         # With the old algorithm every /24 here was compared with every earlier definition:
@@ -179,6 +286,26 @@ class ScalingTest(unittest.TestCase):
         self.assertEqual(len(conflicts), 20_000)
         self.assertTrue(all(earlier == "10.0.0.0/8" for earlier, _, _ in conflicts))
         self.assertLess(elapsed, 10)
+
+
+class GetIPSetTest(unittest.TestCase):
+    def test_formats(self):
+        cases = [
+            ("10.0.0.1/24", ["10.0.0.0/24"]),
+            ("10.0.0.1/255.255.255.0", ["10.0.0.0/24"]),
+            ("10.0.0.1", ["10.0.0.1/32"]),
+            ("10.0.0.1-10.0.0.4", ["10.0.0.1/32", "10.0.0.2/31", "10.0.0.4/32"]),
+            ("2001:db8::1/64", ["2001:db8::/64"]),
+            ("2001:db8::1-2001:db8::2", ["2001:db8::1/128", "2001:db8::2/128"]),
+        ]
+        for subnet, cidrs in cases:
+            with self.subTest(subnet=subnet):
+                self.assertEqual(get_ip_set(subnet), IPSet(cidrs))
+
+    def test_invalid(self):
+        for subnet in ("foo", "10.0.0.0/33", "10.0.0.5-10.0.0.1"):
+            with self.subTest(subnet=subnet), self.assertRaises(InvalidSubnetError):
+                get_ip_set(subnet)
 
 
 class InvalidSubnetTest(unittest.TestCase):
@@ -196,6 +323,43 @@ class InvalidSubnetTest(unittest.TestCase):
             with self.subTest(subnet=subnet), self.assertRaises(InvalidSubnetError) as ctx:
                 check_conflicts(["10.0.0.0/24", subnet])
             self.assertEqual(ctx.exception.subnet, subnet)
+
+    def test_first_invalid_definition_is_reported(self):
+        # In input order, although IPv4 and IPv6 blocks are swept apart
+        with self.assertRaises(InvalidSubnetError) as ctx:
+            check_conflicts(["10.0.0.0/24", "2001:db8::g", "10.0.0.256", "foo"])
+        self.assertEqual(ctx.exception.subnet, "2001:db8::g")
+
+    def test_error(self):
+        error = InvalidSubnetError("foo")
+        self.assertIsInstance(error, ValueError)
+        self.assertEqual((str(error), error.subnet), ("invalid subnet format foo", "foo"))
+
+
+class GarbageCollectorTest(unittest.TestCase):
+    """check_conflicts pauses the garbage collector: it must leave it as it found it."""
+
+    subnets = ("10.0.0.0/24", "10.0.0.1")
+
+    def setUp(self):
+        self.addCleanup(gc.enable if gc.isenabled() else gc.disable)
+
+    def test_state_is_restored(self):
+        for enabled in (True, False):
+            (gc.enable if enabled else gc.disable)()
+            self.assertEqual(len(check_conflicts(self.subnets)), 1)
+            self.assertEqual(gc.isenabled(), enabled)
+
+    def test_state_is_restored_after_an_error(self):
+        failing = mock.Mock(side_effect=RuntimeError)
+        for enabled in (True, False):
+            (gc.enable if enabled else gc.disable)()
+            with (
+                mock.patch("ipconflict.subnet._ip_set_factory", return_value=failing),
+                self.assertRaises(RuntimeError),
+            ):
+                check_conflicts(self.subnets)
+            self.assertEqual(gc.isenabled(), enabled)
 
 
 if __name__ == "__main__":
